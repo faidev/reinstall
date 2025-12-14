@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
-# 至少要 IP 尾号
+# 参数校验
 if [ -z "$1" ]; then
-  echo "用法: $0 <IP最后一位> [root密码]"
+  echo "用法: $0 vm<IP尾号> [root密码]"
+  echo "示例: $0 vm10 123456qwert"
   exit 1
 fi
 
-LAST="$1"
+RAW="$1"
 PASS="${2:-}"
 
-# IP 校验
-if ! [[ "$LAST" =~ ^[0-9]+$ ]] || [ "$LAST" -lt 1 ] || [ "$LAST" -gt 254 ]; then
-  echo "❌ IP 最后一位必须是 1–254"
+# 去掉 vm 前缀
+LAST="${RAW#vm}"
+
+# 校验格式
+if ! [[ "$RAW" =~ ^vm[0-9]+$ ]]; then
+  echo "❌ 参数格式错误，应为 vm<数字>，如 vm10"
+  exit 1
+fi
+
+# 校验 IP 尾号
+if [ "$LAST" -lt 1 ] || [ "$LAST" -gt 254 ]; then
+  echo "❌ IP 尾号必须在 1–254"
   exit 1
 fi
 
@@ -21,7 +31,7 @@ IFACE=$(ip route | awk '/default/ {print $5; exit}')
 [ -z "$IFACE" ] && echo "❌ 无法检测网卡" && exit 1
 
 echo "✅ 网卡: $IFACE"
-echo "✅ IP 尾号: $LAST"
+echo "✅ IP 尾号: $LAST (来自 $RAW)"
 
 # 备份 interfaces
 cp /etc/network/interfaces /etc/network/interfaces.bak.$(date +%F-%H%M%S)
@@ -57,12 +67,13 @@ REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinst
 
 echo "🚀 开始重装 Debian 12"
 
-# 关键：构造参数
 REINSTALL_ARGS=("debian" "12")
 
 if [ -n "$PASS" ]; then
   echo "🔐 使用传入的 root 密码"
   REINSTALL_ARGS+=("--password" "$PASS")
+else
+  echo "ℹ️ 未传入密码"
 fi
 
 if command -v curl >/dev/null 2>&1; then
