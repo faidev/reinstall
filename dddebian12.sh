@@ -40,10 +40,11 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 # ===== Detect default network interface =====
-IFACE="$(
-  ip -4 route show default 2>/dev/null | awk '{print $5; exit}' ||
-  ip -6 route show default 2>/dev/null | awk '{print $5; exit}'
-)"
+IFACE="$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')"
+if [[ -z $IFACE ]]; then
+  IFACE="$(ip -6 route show default 2>/dev/null | awk '{print $5; exit}')"
+fi
+
 if [[ -z "$IFACE" ]]; then
   echo "Failed to detect network interface (no default route)"
   exit 1
