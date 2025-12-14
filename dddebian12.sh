@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Usage:
-#   sudo ./all-in-one.sh vm10
-#   sudo ./all-in-one.sh vm10 123456qwert
+#   sudo ./all-in-one.sh vmXX
+#   sudo ./all-in-one.sh vmXX password
 #
 # Description:
-# - Argument 1: vm<NUMBER>, e.g. vm10 -> IP last octet = 10
+# - Argument 1: vm<NUMBER>, e.g. vmXX -> IP last octet = XX
 #   If not provided, the script will prompt for it interactively.
 # - Argument 2: optional root password
 #   - If provided, --password will be passed to reinstall.sh
@@ -14,7 +14,7 @@ set -euo pipefail
 
 # ===== Get vmXX argument (prompt if missing) =====
 if [[ -z "${1:-}" ]]; then
-  read -rp "Enter VM identifier (format: vm<NUMBER>, e.g. vm10): " RAW
+  read -rp "Enter VM identifier (format: vm<NUMBER>, e.g. vmXXf: " RAW
 else
   RAW="$1"
 fi
@@ -23,7 +23,7 @@ PASS="${2:-}"
 
 # Validate vmXX format
 if ! [[ "$RAW" =~ ^vm[0-9]+$ ]]; then
-  echo "Invalid format. Expected vm<NUMBER>, e.g. vm10"
+  echo "Invalid format. Expected vm<NUMBER>, e.g. vmXX"
   exit 1
 fi
 
