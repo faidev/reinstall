@@ -23,31 +23,31 @@ PASS="${2:-}"
 
 # Validate vmXX format
 if ! [[ "$RAW" =~ ^vm[0-9]+$ ]]; then
-  echo "❌ Invalid format. Expected vm<NUMBER>, e.g. vm10"
+  echo "Invalid format. Expected vm<NUMBER>, e.g. vm10"
   exit 1
 fi
 
 LAST="${RAW#vm}"
 if [[ "$LAST" -lt 1 || "$LAST" -gt 254 ]]; then
-  echo "❌ IP last octet must be between 1 and 254"
+  echo "IP last octet must be between 1 and 254"
   exit 1
 fi
 
 # Must run as root
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "❌ Please run as root: sudo $0 [vmXX] [password]"
+  echo "Please run as root: sudo $0 [vmXX] [password]"
   exit 1
 fi
 
 # ===== Detect default network interface =====
 IFACE="$(ip route | awk '/default/ {print $5; exit}')"
 if [[ -z "$IFACE" ]]; then
-  echo "❌ Failed to detect network interface (no default route)"
+  echo "Failed to detect network interface (no default route)"
   exit 1
 fi
 
-echo "✅ Network interface: $IFACE"
-echo "✅ IP last octet: $LAST (from $RAW)"
+echo "Network interface: $IFACE"
+echo "IP last octet: $LAST (from $RAW)"
 
 # ===== Write /etc/network/interfaces =====
 cp /etc/network/interfaces "/etc/network/interfaces.bak.$(date +%F-%H%M%S)"
@@ -74,10 +74,10 @@ iface $IFACE inet6 static
     autoconf 0
 EOF
 
-echo "✅ Network configuration written to /etc/network/interfaces (backup created)"
+echo "Network configuration written to /etc/network/interfaces (backup created)"
 
 # ===== Restart networking =====
-echo "🔄 Restarting networking service..."
+echo "Restarting networking service..."
 systemctl restart networking
 
 # ===== Check IPv4 and IPv6 connectivity (both required) =====
@@ -85,21 +85,21 @@ check_ipv4() { ping -4 -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; }
 check_ipv6() { ping -6 -c 1 -W 2 2606:4700:4700::1111 >/dev/null 2>&1; }
 
 wait_network() {
-  echo "🔍 Checking IPv4 and IPv6 connectivity (both required)..."
+  echo "Checking IPv4 and IPv6 connectivity (both required)..."
   for i in {1..15}; do
     check_ipv4 && V4=1 || V4=0
     check_ipv6 && V6=1 || V6=0
 
     if [[ "$V4" -eq 1 && "$V6" -eq 1 ]]; then
-      echo "✅ IPv4 and IPv6 connectivity confirmed"
+      echo "IPv4 and IPv6 connectivity confirmed"
       return 0
     fi
 
-    echo "⏳ Waiting for network ($i/15)... IPv4=$V4 IPv6=$V6"
+    echo "Waiting for network ($i/15)... IPv4=$V4 IPv6=$V6"
     sleep 2
   done
 
-  echo "❌ Network check failed: IPv4=$V4 IPv6=$V6 (installation aborted)"
+  echo "Network check failed: IPv4=$V4 IPv6=$V6 (installation aborted)"
   return 1
 }
 
@@ -110,32 +110,32 @@ REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinst
 REINSTALL_ARGS=("debian" "12")
 
 if [[ -n "$PASS" ]]; then
-  echo "🔐 Root password provided, passing --password to reinstall.sh"
+  echo "Root password provided, passing --password to reinstall.sh"
   REINSTALL_ARGS+=("--password" "$PASS")
 else
-  echo "ℹ️ No root password provided, --password will not be used"
+  echo "No root password provided, --password will not be used"
 fi
 
-echo "🚀 Starting system reinstall: reinstall.sh ${REINSTALL_ARGS[*]}"
+echo "Starting system reinstall: reinstall.sh ${REINSTALL_ARGS[*]}"
 
 if command -v curl >/dev/null 2>&1; then
   bash <(curl -fsSL "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
 elif command -v wget >/dev/null 2>&1; then
   bash <(wget -qO- "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
 else
-  echo "❌ Neither curl nor wget is available"
+  echo "Neither curl nor wget is available"
   exit 1
 fi
 
 # ===== Ask whether to reboot =====
 echo
-read -rp "🔄 Reboot the server now? [y/N]: " ANSWER
+read -rp "Reboot the server now? [y/N]: " ANSWER
 case "$ANSWER" in
   y|Y|yes|YES)
-    echo "♻️ Rebooting now..."
+    echo "Rebooting now..."
     reboot
     ;;
   *)
-    echo "ℹ️ Reboot skipped. You may reboot manually later."
+    echo "Reboot skipped. You may reboot manually later."
     ;;
 esac
