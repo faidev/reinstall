@@ -1,42 +1,57 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# 参数校验
-if [ -z "$1" ]; then
-  echo "用法: $0 vm<IP尾号> [root密码]"
-  echo "示例: $0 vm10 123456qwert"
+# Usage:
+#   sudo ./all-in-one.sh vm10
+#   sudo ./all-in-one.sh vm10 123456qwert
+#
+# Description:
+# - Argument 1: vm<NUMBER>, e.g. vm10 -> IP last octet = 10
+# - Argument 2: optional root password
+#   - If provided, --password will be passed to reinstall.sh
+#   - If not provided, --password will NOT be used
+
+# ===== Argument handling =====
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 vm<IP_LAST_OCTET> [root_password]"
+  echo "Example: $0 vm10 123456qwert"
   exit 1
 fi
 
 RAW="$1"
 PASS="${2:-}"
 
-# 去掉 vm 前缀
-LAST="${RAW#vm}"
-
-# 校验格式
+# Validate vmXX format
 if ! [[ "$RAW" =~ ^vm[0-9]+$ ]]; then
-  echo "❌ 参数格式错误，应为 vm<数字>，如 vm10"
+  echo "❌ Invalid argument format. Expected vm<NUMBER>, e.g. vm10"
   exit 1
 fi
 
-# 校验 IP 尾号
-if [ "$LAST" -lt 1 ] || [ "$LAST" -gt 254 ]; then
-  echo "❌ IP 尾号必须在 1–254"
+LAST="${RAW#vm}"
+if [[ "$LAST" -lt 1 || "$LAST" -gt 254 ]]; then
+  echo "❌ IP last octet must be between 1 and 254"
   exit 1
 fi
 
-# 自动检测默认网卡
-IFACE=$(ip route | awk '/default/ {print $5; exit}')
-[ -z "$IFACE" ] && echo "❌ 无法检测网卡" && exit 1
+# Must run as root
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "❌ Please run as root: sudo $0 $RAW [password]"
+  exit 1
+fi
 
-echo "✅ 网卡: $IFACE"
-echo "✅ IP 尾号: $LAST (来自 $RAW)"
+# ===== Detect default network interface =====
+IFACE="$(ip route | awk '/default/ {print $5; exit}')"
+if [[ -z "$IFACE" ]]; then
+  echo "❌ Failed to detect network interface (no default route)"
+  exit 1
+fi
 
-# 备份 interfaces
-cp /etc/network/interfaces /etc/network/interfaces.bak.$(date +%F-%H%M%S)
+echo "✅ Network interface: $IFACE"
+echo "✅ IP last octet: $LAST (from $RAW)"
 
-# 写入网络配置
+# ===== Write /etc/network/interfaces =====
+cp /etc/network/interfaces "/etc/network/interfaces.bak.$(date +%F-%H%M%S)"
+
 cat > /etc/network/interfaces <<EOF
 source /etc/network/interfaces.d/*
 
@@ -59,28 +74,55 @@ iface $IFACE inet6 static
     autoconf 0
 EOF
 
-echo "🔄 重启 networking..."
+echo "✅ Network configuration written to /etc/network/interfaces (backup created)"
+
+# ===== Restart networking =====
+echo "🔄 Restarting networking service..."
 systemctl restart networking
 
-# ===== 在线执行 reinstall =====
+# ===== Check IPv4 and IPv6 connectivity (both must work) =====
+check_ipv4() { ping -4 -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; }
+check_ipv6() { ping -6 -c 1 -W 2 2606:4700:4700::1111 >/dev/null 2>&1; }
+
+wait_network() {
+  echo "🔍 Checking IPv4 and IPv6 connectivity (both required)..."
+  for i in {1..15}; do
+    check_ipv4 && V4=1 || V4=0
+    check_ipv6 && V6=1 || V6=0
+
+    if [[ "$V4" -eq 1 && "$V6" -eq 1 ]]; then
+      echo "✅ IPv4 and IPv6 connectivity confirmed"
+      return 0
+    fi
+
+    echo "⏳ Waiting for network ($i/15)... IPv4=$V4 IPv6=$V6"
+    sleep 2
+  done
+
+  echo "❌ Network check failed: IPv4=$V4 IPv6=$V6 (installation aborted)"
+  return 1
+}
+
+wait_network
+
+# ===== Run reinstall.sh online (Debian 12) =====
 REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
-
-echo "🚀 开始重装 Debian 12"
-
 REINSTALL_ARGS=("debian" "12")
 
-if [ -n "$PASS" ]; then
-  echo "🔐 使用传入的 root 密码"
+if [[ -n "$PASS" ]]; then
+  echo "🔐 Root password provided, passing --password to reinstall.sh"
   REINSTALL_ARGS+=("--password" "$PASS")
 else
-  echo "ℹ️ 未传入密码"
+  echo "ℹ️ No root password provided, --password will not be used"
 fi
+
+echo "🚀 Starting system reinstall: reinstall.sh ${REINSTALL_ARGS[*]}"
 
 if command -v curl >/dev/null 2>&1; then
   bash <(curl -fsSL "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
 elif command -v wget >/dev/null 2>&1; then
   bash <(wget -qO- "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
 else
-  echo "❌ curl / wget 均不存在"
+  echo "❌ Neither curl nor wget is available"
   exit 1
 fi
