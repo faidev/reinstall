@@ -7,23 +7,23 @@ set -euo pipefail
 #
 # Description:
 # - Argument 1: vm<NUMBER>, e.g. vm10 -> IP last octet = 10
+#   If not provided, the script will prompt for it interactively.
 # - Argument 2: optional root password
 #   - If provided, --password will be passed to reinstall.sh
 #   - If not provided, --password will NOT be used
 
-# ===== Argument handling =====
-if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 vm<IP_LAST_OCTET> [root_password]"
-  echo "Example: $0 vm10 123456qwert"
-  exit 1
+# ===== Get vmXX argument (prompt if missing) =====
+if [[ -z "${1:-}" ]]; then
+  read -rp "Enter VM identifier (format: vm<NUMBER>, e.g. vm10): " RAW
+else
+  RAW="$1"
 fi
 
-RAW="$1"
 PASS="${2:-}"
 
 # Validate vmXX format
 if ! [[ "$RAW" =~ ^vm[0-9]+$ ]]; then
-  echo "❌ Invalid argument format. Expected vm<NUMBER>, e.g. vm10"
+  echo "❌ Invalid format. Expected vm<NUMBER>, e.g. vm10"
   exit 1
 fi
 
@@ -35,7 +35,7 @@ fi
 
 # Must run as root
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "❌ Please run as root: sudo $0 $RAW [password]"
+  echo "❌ Please run as root: sudo $0 [vmXX] [password]"
   exit 1
 fi
 
@@ -80,7 +80,7 @@ echo "✅ Network configuration written to /etc/network/interfaces (backup creat
 echo "🔄 Restarting networking service..."
 systemctl restart networking
 
-# ===== Check IPv4 and IPv6 connectivity (both must work) =====
+# ===== Check IPv4 and IPv6 connectivity (both required) =====
 check_ipv4() { ping -4 -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; }
 check_ipv6() { ping -6 -c 1 -W 2 2606:4700:4700::1111 >/dev/null 2>&1; }
 
