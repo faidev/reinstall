@@ -126,3 +126,16 @@ else
   echo "❌ Neither curl nor wget is available"
   exit 1
 fi
+
+# ===== Ask whether to reboot =====
+echo
+read -rp "🔄 Reboot the server now? [y/N]: " ANSWER
+case "$ANSWER" in
+  y|Y|yes|YES)
+    echo "♻️ Rebooting now..."
+    reboot
+    ;;
+  *)
+    echo "ℹ️ Reboot skipped. You may reboot manually later."
+    ;;
+esac
