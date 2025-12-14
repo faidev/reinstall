@@ -15,7 +15,7 @@ if ! [[ "$LAST" =~ ^[0-9]+$ ]] || [ "$LAST" -lt 1 ] || [ "$LAST" -gt 254 ]; then
   exit 1
 fi
 
-# 自动获取默认网卡名
+# 自动检测默认网卡
 IFACE=$(ip route | awk '/default/ {print $5; exit}')
 [ -z "$IFACE" ] && echo "❌ 无法检测网卡" && exit 1
 
@@ -50,8 +50,8 @@ EOF
 
 echo "✅ 配置已写入 /etc/network/interfaces"
 
-# 重启网卡
-ifdown "$IFACE" 2>/dev/null || true
-ifup "$IFACE"
+# 使用 systemctl 重启 networking
+echo "🔄 正在重启 networking 服务..."
+systemctl restart networking
 
-echo "✅ 网卡已重启"
+echo "✅ networking 已重启"
