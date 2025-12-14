@@ -111,7 +111,7 @@ wait_network
 
 # ===== Run reinstall.sh online (Debian 12) =====
 REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
-REINSTALL_ARGS=("debian" "12")
+REINSTALL_ARGS=("debian" "13")
 
 if [[ -n "$PASS" ]]; then
   echo "Root password provided, passing --password to reinstall.sh"
