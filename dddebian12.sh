@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-# 参数校验
+# 至少要 IP 尾号
 if [ -z "$1" ]; then
-  echo "用法: $0 <IP最后一位>"
+  echo "用法: $0 <IP最后一位> [root密码]"
   exit 1
 fi
 
 LAST="$1"
+PASS="${2:-}"
 
-# 简单校验（1–254）
+# IP 校验
 if ! [[ "$LAST" =~ ^[0-9]+$ ]] || [ "$LAST" -lt 1 ] || [ "$LAST" -gt 254 ]; then
   echo "❌ IP 最后一位必须是 1–254"
   exit 1
@@ -22,10 +23,10 @@ IFACE=$(ip route | awk '/default/ {print $5; exit}')
 echo "✅ 网卡: $IFACE"
 echo "✅ IP 尾号: $LAST"
 
-# 备份原配置
+# 备份 interfaces
 cp /etc/network/interfaces /etc/network/interfaces.bak.$(date +%F-%H%M%S)
 
-# 写入配置
+# 写入网络配置
 cat > /etc/network/interfaces <<EOF
 source /etc/network/interfaces.d/*
 
@@ -48,10 +49,27 @@ iface $IFACE inet6 static
     autoconf 0
 EOF
 
-echo "✅ 配置已写入 /etc/network/interfaces"
-
-# 使用 systemctl 重启 networking
-echo "🔄 正在重启 networking 服务..."
+echo "🔄 重启 networking..."
 systemctl restart networking
 
-echo "✅ networking 已重启"
+# ===== 在线执行 reinstall =====
+REINSTALL_URL="https://raw.githubusercontent.com/bin456789/reinstall/main/reinstall.sh"
+
+echo "🚀 开始重装 Debian 12"
+
+# 关键：构造参数
+REINSTALL_ARGS=("debian" "12")
+
+if [ -n "$PASS" ]; then
+  echo "🔐 使用传入的 root 密码"
+  REINSTALL_ARGS+=("--password" "$PASS")
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  bash <(curl -fsSL "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
+elif command -v wget >/dev/null 2>&1; then
+  bash <(wget -qO- "$REINSTALL_URL") "${REINSTALL_ARGS[@]}"
+else
+  echo "❌ curl / wget 均不存在"
+  exit 1
+fi
