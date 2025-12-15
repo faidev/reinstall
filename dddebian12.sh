@@ -137,7 +137,7 @@ read -rp "Reboot the server now? [y/N]: " ANSWER
 case "$ANSWER" in
   y|Y|yes|YES)
     echo "Rebooting now..."
-    reboot
+    /sbin/reboot
     ;;
   *)
     echo "Reboot skipped. You may reboot manually later."
